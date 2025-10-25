@@ -1,10 +1,11 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import routes from './routes';
-import './services/firebase/firebase.service';
-import { errorHandler } from './middlewares/error.middleware';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import routes from "./routes";
+import { errorHandler } from "./middlewares/error.middleware";
+
+import "./services/firebase/firebase.service";
 
 const app = express();
 
@@ -13,11 +14,11 @@ const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Lista de origens permitidas
     const allowedOrigins = [
-      'http://localhost:19006', // Expo Web
-      'http://localhost:8081',  // React Native Debugger
-      'capacitor://localhost',
-      'ionic://localhost',
-      'http://10.0.2.2:3002',    // Para Android Emulator
+      "http://localhost:19006", // Expo Web
+      "http://localhost:8081", // React Native Debugger
+      "capacitor://localhost",
+      "ionic://localhost",
+      "http://10.0.2.2:3002", // Para Android Emulator
     ];
 
     // Adiciona domínio de produção se existir
@@ -36,39 +37,32 @@ const corsOptions: cors.CorsOptions = {
     }
 
     // Verifica match com regex para IPs locais e domínios
-    if (/\.finwiseapp\.com$/.test(origin) || /^http:\/\/192\.168\.\d+\.\d+/.test(origin)) {
+    if (
+      /\.finwiseapp\.com$/.test(origin) ||
+      /^http:\/\/192\.168\.\d+\.\d+/.test(origin)
+    ) {
       return callback(null, true);
     }
 
     // Origin não permitida
-    callback(new Error('Not allowed by CORS'));
+    callback(new Error("Not allowed by CORS"));
   },
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200,
 };
 
 // Middlewares
 app.use(cors(corsOptions));
 app.use(helmet());
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(express.json());
 
-app.options('*', cors(corsOptions)); // Habilita preflight para todas as rotas
-
-// Health Check Endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    service: 'FinWise API'
-  });
-});
+app.options("*", cors(corsOptions)); // Habilita preflight para todas as rotas
 
 // Routes
-app.use('/backend', routes);
+app.use("/backend", routes);
 
 // Error handling
 app.use(errorHandler);

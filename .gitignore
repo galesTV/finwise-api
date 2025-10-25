@@ -6,3 +6,9 @@
 
 # Dependencies
 node_modules/
+
+# Build outputs
+dist/
+
+# Config files
+config.ts

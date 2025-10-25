@@ -1,13 +1,11 @@
-import { ImageSourcePropType } from "react-native";
-
 export interface Categoria {
   id?: string;
   nome: string;
   cor: string;
-  tipo: 'fixa' | 'variavel';
+  tipo: "fixa" | "variavel";
   userId: string;
   subcategorias?: Subcategoria[];
-  imagem?: ImageSourcePropType;
+  imagem?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

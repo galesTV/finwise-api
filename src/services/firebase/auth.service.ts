@@ -1,5 +1,5 @@
-import { auth, db, FieldValue, FirebaseAdminError } from './firebase.service';
-import { ApiError } from '../../utils/apiError';
+import { auth, db, FieldValue, FirebaseAdminError } from "./firebase.service";
+import { ApiError } from "../../utils/apiError";
 
 interface MobileUserData {
   uid: string;
@@ -10,14 +10,22 @@ interface MobileUserData {
 
 export class AuthService {
   // Registro para mobile
-  static async registerMobile(email: string, password: string, name: string, phone?: string) {
+  static async registerMobile(
+    email: string,
+    password: string,
+    name: string,
+    phone?: string
+  ) {
     try {
       // Verificar se o email já existe
       try {
         await auth.getUserByEmail(email);
-        throw new ApiError(400, 'Email já está em uso');
+        throw new ApiError(400, "Email já está em uso");
       } catch (error) {
-        if (error instanceof Error && (error as FirebaseAdminError).code !== 'auth/user-not-found') {
+        if (
+          error instanceof Error &&
+          (error as FirebaseAdminError).code !== "auth/user-not-found"
+        ) {
           throw error;
         }
       }
@@ -27,7 +35,7 @@ export class AuthService {
         email,
         password,
         displayName: name,
-        ...(phone && { phoneNumber: phone })
+        ...(phone && { phoneNumber: phone }),
       });
 
       // 2. Criar documento completo no Firestore
@@ -43,12 +51,12 @@ export class AuthService {
         state: null,
         financialGoal: null,
         emailVerified: false,
-        status: 'active',
+        status: "active",
         createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp(),
       };
 
-      await db.collection('usuarios').doc(userRecord.uid).set(userData);
+      await db.collection("usuarios").doc(userRecord.uid).set(userData);
 
       // Gerar token
       const customToken = await auth.createCustomToken(userRecord.uid);
@@ -59,11 +67,11 @@ export class AuthService {
         name,
         phone,
         idToken: customToken,
-        refreshToken: ''
+        refreshToken: "",
       };
     } catch (error) {
-      console.error('Erro detalhado no registro:', error);
-      throw new ApiError(500, 'Erro durante o registro');
+      console.error("Erro detalhado no registro:", error);
+      throw new ApiError(500, "Erro durante o registro");
     }
   }
 
@@ -72,12 +80,12 @@ export class AuthService {
     try {
       // Verificar usuário no Firebase Auth
       const userRecord = await auth.getUserByEmail(email);
-      
+
       // Obter dados adicionais do Firestore
-      const userDoc = await db.collection('usuarios').doc(userRecord.uid).get();
-      
+      const userDoc = await db.collection("usuarios").doc(userRecord.uid).get();
+
       if (!userDoc.exists) {
-        throw new ApiError(404, 'Usuário não encontrado');
+        throw new ApiError(404, "Usuário não encontrado");
       }
 
       const userData = userDoc.data() as MobileUserData;
@@ -91,17 +99,17 @@ export class AuthService {
         name: userData.name,
         phone: userData.phone,
         idToken: customToken,
-        refreshToken: '' // O Firebase gerencia isso no cliente
+        refreshToken: "", // O Firebase gerencia isso no cliente
       };
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       const firebaseError = error as FirebaseAdminError;
-      console.error('Erro no login:', firebaseError);
-      
-      throw new ApiError(401, 'Credenciais inválidas');
+      console.error("Erro no login:", firebaseError);
+
+      throw new ApiError(401, "Credenciais inválidas");
     }
   }
 
@@ -115,11 +123,11 @@ export class AuthService {
 
       return {
         idToken: newToken,
-        refreshToken: '' // O Firebase gerencia isso automaticamente no cliente
+        refreshToken: "", // O Firebase gerencia isso automaticamente no cliente
       };
     } catch (error) {
-      console.error('Erro ao renovar token:', error);
-      throw new ApiError(401, 'Refresh token inválido ou expirado');
+      console.error("Erro ao renovar token:", error);
+      throw new ApiError(401, "Refresh token inválido ou expirado");
     }
   }
 }
