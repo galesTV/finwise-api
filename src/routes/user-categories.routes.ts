@@ -5,6 +5,7 @@ import {
   checkSalaryPayment,
   updateLastPayment,
   updateSubcategoryInUser,
+  processFixedExpenses,
 } from "../controllers/user-categories.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 
@@ -17,5 +18,6 @@ router.post("/save", saveUserCategories);
 router.get("/check-salary", checkSalaryPayment);
 router.post("/update-last-payment", updateLastPayment);
 router.patch("/update-subcategory", updateSubcategoryInUser);
+router.post("/process-fixed-expenses", processFixedExpenses);
 
 export default router;

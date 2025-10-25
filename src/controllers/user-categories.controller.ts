@@ -270,3 +270,193 @@ export const updateSubcategoryInUser = async (
     next(new ApiError(500, "Erro ao atualizar subcategoria"));
   }
 };
+
+export const processFixedExpenses = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user?.uid) {
+      throw new ApiError(401, "Usuário não autenticado");
+    }
+
+    const userId = req.user.uid;
+    const today = new Date();
+
+    // Busca categorias do usuário
+    const userDoc = await db.collection("user_categories").doc(userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(200).json({
+        success: true,
+        processed: 0,
+        message: "Nenhuma categoria encontrada",
+      });
+    }
+
+    const userData = userDoc.data();
+    const fixedCategories = userData?.categorias?.fixa || [];
+
+    let processedCount = 0;
+
+    for (const category of fixedCategories) {
+      if (category.nome === "Adicione") continue;
+
+      for (const subcategory of category.subcategorias || []) {
+        // Só processa se for uma despesa fixa configurada
+        if (subcategory.isFixed && subcategory.frequency) {
+          const shouldProcess = await shouldProcessFixedExpense(
+            subcategory,
+            category,
+            today,
+            userId
+          );
+
+          if (shouldProcess) {
+            await processSingleFixedExpense(userId, category, subcategory);
+            processedCount++;
+          }
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      processed: processedCount,
+      message: `${processedCount} despesas fixas processadas`,
+    });
+  } catch (error) {
+    console.error("Erro ao processar despesas fixas:", error);
+    next(new ApiError(500, "Erro ao processar despesas fixas"));
+  }
+};
+
+async function processSingleFixedExpense(
+  userId: string,
+  category: any,
+  subcategory: any
+): Promise<void> {
+  const batch = db.batch();
+  const today = new Date();
+
+  // Busca saldo atual do usuário
+  const userRef = db.collection("usuarios").doc(userId);
+  const userSnapshot = await userRef.get();
+  const saldoAtual = userSnapshot.data()?.saldo || 0;
+
+  // Cria transação
+  const transactionRef = db.collection("transactions").doc();
+  const transactionData = {
+    userId: userId,
+    type: "expense",
+    amount: subcategory.limit,
+    category: category.nome,
+    subcategory: subcategory.name,
+    date: today.toISOString(),
+    paid: true,
+    fixed: true,
+    reminder: false,
+    ignore: false,
+    note: `Despesa fixa: ${subcategory.name}`,
+    source: "Despesa Fixa",
+    wallet: "Carteira",
+    createdAt: today.toISOString(),
+    updatedAt: today.toISOString(),
+  };
+  batch.set(transactionRef, transactionData);
+
+  // Atualiza saldo
+  const novoSaldo = saldoAtual - subcategory.limit;
+  batch.update(userRef, {
+    saldo: novoSaldo,
+    updatedAt: today.toISOString(),
+  });
+
+  // Atualiza última execução
+  const logRef = db
+    .collection("fixed_expenses_log")
+    .doc(`${userId}_${category.id}_${subcategory.name}`);
+  batch.set(logRef, {
+    lastExecution: today.toISOString(),
+    updatedAt: today.toISOString(),
+  });
+
+  await batch.commit();
+}
+
+// Função auxiliar para verificar se deve processar a despesa
+async function shouldProcessFixedExpense(
+  subcategory: any,
+  category: any,
+  today: Date,
+  userId: string
+): Promise<boolean> {
+  if (!subcategory.limit || subcategory.limit <= 0) return false;
+
+  // Busca última execução
+  const lastExecDoc = await db
+    .collection("fixed_expenses_log")
+    .doc(`${userId}_${category.id}_${subcategory.name}`)
+    .get();
+
+  const lastExecution = lastExecDoc.exists
+    ? new Date(lastExecDoc.data()?.lastExecution)
+    : null;
+
+  // Verifica frequência
+  return checkFrequency(category.frequencia, today, lastExecution);
+}
+
+// Função para verificar frequência
+function checkFrequency(
+  frequency: string,
+  today: Date,
+  lastExecution: Date | null
+): boolean {
+  if (!lastExecution) return true;
+
+  const diffTime = Math.abs(today.getTime() - lastExecution.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  switch (frequency) {
+    case "diario":
+      return diffDays >= 1;
+    case "semanal":
+      return diffDays >= 7;
+    case "quinzenal":
+      return diffDays >= 15;
+    case "mensal":
+      return today.getDate() === 1 && diffDays >= 28;
+    case "trimestral":
+      return (
+        today.getDate() === 1 && today.getMonth() % 3 === 0 && diffDays >= 89
+      );
+    case "semestral":
+      return (
+        today.getDate() === 1 &&
+        (today.getMonth() === 0 || today.getMonth() === 6) &&
+        diffDays >= 180
+      );
+    case "anual":
+      return today.getDate() === 1 && today.getMonth() === 0 && diffDays >= 365;
+    default:
+      return false;
+  }
+}
+
+// Função para atualizar última execução
+async function updateLastExecution(
+  userId: string,
+  categoryId: string,
+  subcategoryName: string,
+  date: Date
+) {
+  await db
+    .collection("fixed_expenses_log")
+    .doc(`${userId}_${categoryId}_${subcategoryName}`)
+    .set({
+      lastExecution: date.toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+}
